@@ -1,70 +1,86 @@
 # Distributed Lock Prototype
 
-A simple Java prototype demonstrating distributed lock implementation using Redis. This project shows how multiple consumers can safely acquire and release locks in a distributed environment.
+A Java prototype demonstrating distributed lock implementation with Redis. Includes two versions:
+1. **Unsafe** - Simple delete (vulnerable to race conditions)
+2. **Safe** - Value checking before delete (prevents race conditions)
 
-## Overview
+## Two Implementations
 
-This is a **simple lock and release use case** where:
-- Multiple threads compete to acquire a lock
-- Once acquired, the thread holds the lock for a configurable duration
-- The lock is released by simply deleting it from Redis (no value checking)
-- Race conditions can occur when work duration exceeds lock TTL
+### Unsafe Version (No Value Checking)
+- Simply deletes lock from Redis
+- Fast, but vulnerable when lock expires during work
+- File: `DistributedLock.java`
+
+### Safe Version (Value Checking)
+- Checks lock value before deleting
+- Prevents wrong consumer from deleting another's lock
+- File: `DistributedLockWithValueCheck.java`
 
 ## How to Run
 
-### Safe Scenario (No Race Condition)
+### Unsafe Version (No Race Condition)
 Work duration is 500ms, which is less than the 1 second lock TTL:
 
 ```bash
-docker compose up --build -d & sleep 3 && docker compose logs --tail=50
+docker compose --profile unsafe up --build -d & sleep 3 && docker compose logs --tail=50
 ```
 
-Or explicitly pass the work duration:
+Or with custom work duration:
 ```bash
-WORK_DURATION=500 docker compose up --build -d & sleep 3 && docker compose logs --tail=50
+WORK_DURATION=500 docker compose --profile unsafe up --build -d & sleep 3 && docker compose logs --tail=50
 ```
 
 **Expected behavior:**
 ```
+Application starting...
 Work duration: 500ms, Lock TTL: 1s
 Consumer 3 acquired the lock.
 Consumer 3 attempting to release the lock.
 Lock released successfully.
-Consumer 1 acquired the lock.
 ...
 Application finished.
 ```
 
-All consumers safely acquire and release locks because they complete before TTL expires.
-
 ---
 
-### Race Condition Scenario (Lock Expiry During Release)
-Work duration is 1500ms, which exceeds the 1 second lock TTL.
+### Unsafe Version (Race Condition Scenario)
+Work duration exceeds TTL to trigger race condition:
 
-Pass the work duration as an environment variable:
 ```bash
-WORK_DURATION=1500 docker compose up --build -d & sleep 5 && docker compose logs --tail=100
+WORK_DURATION=1500 docker compose --profile unsafe up --build -d & sleep 5 && docker compose logs --tail=100
 ```
 
 **What happens:**
 1. Consumer 1 acquires lock (1500ms work starts)
-2. At ~1 second: Lock TTL expires in Redis (lock becomes available)
-3. Consumer 2 acquires the same lock
-4. At ~1.5 seconds: Consumer 1 finishes and calls `releaseLock()`
-5. **Consumer 1 deletes Consumer 2's lock** ❌ (Wrong consumer deleted it!)
+2. At ~1 second: Lock TTL expires in Redis
+3. Consumer 2 acquires the lock
+4. At ~1.5 seconds: Consumer 1 finishes and deletes lock
+5. **Result:** Consumer 1 deleted Consumer 2's lock ❌
+
+---
+
+### Safe Version (Race Condition Handled)
+Same scenario but with value checking:
+
+```bash
+WORK_DURATION=1500 docker compose --profile safe up --build -d & sleep 5 && docker compose logs --tail=100
+```
+
+**What happens:**
+1. Consumer 1 acquires lock (1500ms work starts)
+2. At ~1 second: Lock TTL expires, Consumer 2 acquires it
+3. At ~1.5 seconds: Consumer 1 tries to release
+4. **Result:** Lock NOT released - value mismatch detected ✓
 
 **Evidence in logs:**
 ```
 Consumer 1 acquired the lock.
 ...
-Consumer 2 acquired the lock.         ← Lock expired, Consumer 2 got it
+Consumer 2 acquired the lock.
 ...
-Consumer 1 attempting to release.    ← Consumer 1 still finishing
-Lock released successfully.           ← Deletes Consumer 2's lock!
+Consumer 1 attempting to release.
+Lock NOT released - value mismatch (expected: consumer-1, found: consumer-2)
 ```
-
-This demonstrates why value checking is essential in distributed locks.
 
 ---
 
@@ -72,24 +88,52 @@ This demonstrates why value checking is essential in distributed locks.
 
 ```
 ├── src/main/java/com/example/
-│   └── DistributedLock.java      # Main application with lock logic
-├── pom.xml                         # Maven build configuration
-├── Dockerfile                      # Multi-stage Docker build
-├── docker-compose.yml              # Service orchestration
-└── README.md                       # This file
+│   ├── DistributedLock.java              # Unsafe version (no value checking)
+│   └── DistributedLockWithValueCheck.java # Safe version (value checking)
+├── pom.xml                                # Maven build configuration
+├── Dockerfile                             # Multi-stage Docker build (supports both)
+├── docker-compose.yml                     # Services for both implementations
+└── README.md                              # This file
+```
+
+## Docker Profiles
+
+The project uses Docker Compose profiles to run different implementations:
+
+```bash
+# Run unsafe version
+docker compose --profile unsafe up --build
+
+# Run safe version  
+docker compose --profile safe up --build
+
+# Run both (separate containers)
+docker compose up --build
 ```
 
 ## Technical Details
 
 - **Lock Key**: `my-distributed-lock`
 - **Lock TTL**: 1 second (auto-expires if not released)
-- **Default Work Duration**: 500ms (can be passed as command argument)
+- **Work Duration**: Configurable via `WORK_DURATION` environment variable (default 500ms)
 - **Lock Mechanism**: Redis SETNX (atomic "set if not exists")
-- **Release**: Simple `del` (no value checking - vulnerable to race conditions)
 
-## Notes
+### Unsafe Release
+```java
+jedis.del(LOCK_KEY);  // Simple delete, no checking
+```
 
-- This prototype demonstrates why **value checking is critical** in distributed locks
-- When work duration < TTL: Safe, no race condition
-- When work duration > TTL: Race condition occurs, wrong consumer can delete the lock
-- For production: Use Redlock algorithm or value-checking with Lua scripts
+### Safe Release
+```java
+if (lockValue.equals(jedis.get(LOCK_KEY))) {
+    jedis.del(LOCK_KEY);  // Only delete if value matches
+}
+```
+
+## Lessons
+
+This prototype demonstrates:
+- **Race conditions** occur when work duration > lock TTL
+- **Value checking is critical** to prevent wrong consumer from deleting lock
+- Simple delete is vulnerable but fast; value checking is safe but requires atomic operations
+- Production systems use Redlock or Lua scripts for guaranteed atomicity

@@ -6,10 +6,26 @@ services:
     ports:
       - "6379:6379"
 
-  app:
-    build: .
+  app-unsafe:
+    build:
+      context: .
+      args:
+        MAIN_CLASS: com.example.DistributedLock
     depends_on:
       - redis
     environment:
       - REDIS_HOST=redis
     command: ["${WORK_DURATION:-500}"]
+    profiles: ["unsafe"]
+
+  app-safe:
+    build:
+      context: .
+      args:
+        MAIN_CLASS: com.example.DistributedLockWithValueCheck
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+    command: ["${WORK_DURATION:-500}"]
+    profiles: ["safe"]
