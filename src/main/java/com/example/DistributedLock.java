@@ -1,8 +1,8 @@
 package com.example;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.params.SetParams;
 
@@ -28,12 +28,7 @@ public class DistributedLock {
         System.out.println("Application starting...");
         
         // Create a thread pool with NUM_CONSUMERS threads
-        // executor.submit() allows concurrent execution of consumer tasks
-        // without manually creating/managing threads
         ExecutorService executor = Executors.newFixedThreadPool(NUM_CONSUMERS);
-        
-        // CountDownLatch allows main thread to wait until all consumers complete
-        CountDownLatch latch = new CountDownLatch(NUM_CONSUMERS);
 
         for (int i = 0; i < NUM_CONSUMERS; i++) {
             int consumerId = i;
@@ -65,13 +60,14 @@ public class DistributedLock {
                     if (jedis != null) {
                         jedis.close();
                     }
-                    latch.countDown();
                 }
             });
         }
 
+        // Wait for all submitted tasks to complete
+        executor.shutdown();
         try {
-            latch.await();
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             System.err.println("Main thread interrupted while waiting for consumers.");
