@@ -7,6 +7,15 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.params.SetParams;
 
 
+/**
+ * Simple Distributed Lock Implementation
+ *
+ * This is a straightforward lock and release use case where:
+ * - Locks are always released before TTL expires (500ms work < 1 second TTL)
+ * - No value checking needed during release (controlled timing)
+ * - Multiple consumers safely take turns holding the lock
+ * - Uses Redis SETNX for atomic lock acquisition
+ */
 public class DistributedLock {
 
     private static final String LOCK_KEY = "my-distributed-lock";
@@ -17,12 +26,19 @@ public class DistributedLock {
     public static void main(String[] args) {
         System.out.println("REDIS_HOST: " + REDIS_HOST);
         System.out.println("Application starting...");
+        
+        // Create a thread pool with NUM_CONSUMERS threads
+        // executor.submit() allows concurrent execution of consumer tasks
+        // without manually creating/managing threads
         ExecutorService executor = Executors.newFixedThreadPool(NUM_CONSUMERS);
+        
+        // CountDownLatch allows main thread to wait until all consumers complete
         CountDownLatch latch = new CountDownLatch(NUM_CONSUMERS);
 
         for (int i = 0; i < NUM_CONSUMERS; i++) {
             int consumerId = i;
 
+            // Submit consumer task to thread pool for concurrent execution
             executor.submit(() -> {
                 Jedis jedis = null;
                 String lockValue = "consumer-" + consumerId;
@@ -68,12 +84,28 @@ public class DistributedLock {
         System.out.println("Application finished.");
     }
 
+    /**
+     * Attempt to acquire distributed lock using Redis SETNX
+     * 
+     * SetParams.nx() = SET if Not eXists (atomic operation)
+     * SetParams.ex(1) = EXpire after 1 second (TTL safety)
+     * 
+     * Returns true only if lock was successfully acquired (first consumer)
+     */
     private static boolean acquireLock(Jedis jedis, String lockValue) throws InterruptedException {
         SetParams setParams = new SetParams().nx().ex(LOCK_TTL_SECONDS);
         String result = jedis.set(LOCK_KEY, lockValue, setParams);
         return "OK".equals(result);
     }
 
+    /**
+     * Release the distributed lock by deleting it from Redis
+     * 
+     * Simple release (no value checking) because:
+     * - Locks are always released before TTL (500ms < 1 second)
+     * - We control the release timing, so no other consumer can steal it
+     * - This is a straightforward lock/release use case
+     */
     private static void releaseLock(Jedis jedis) {
         jedis.del(LOCK_KEY);
         System.out.println("Lock released successfully.");
