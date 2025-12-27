@@ -29,18 +29,9 @@ public class DistributedLockWithLuaScript {
     private static long workDurationMs = 500;
     
     // Lua script for atomic check-and-delete
-    // KEYS[1] = lock key
-    // ARGV[1] = expected lock value
-    // Returns: 1 if deleted (we owned it), 0 if didn't own it
+    // Deliberate busy-wait to demonstrate atomicity by blocking the Redis server
     private static final String LUA_SCRIPT = 
-        "redis.replicate_commands(); " +
-        "local start = redis.call('TIME'); " +
-        "local start_ms = (start[1] * 1000) + (start[2] / 1000); " +
-        "while true do " +
-            "local now = redis.call('TIME'); " +
-            "local now_ms = (now[1] * 1000) + (now[2] / 1000); " +
-            "if (now_ms - start_ms) >= 100 then break end " +
-        "end; " +
+        "for i = 1, 10000000 do end; " +
         "if redis.call('get', KEYS[1]) == ARGV[1] then " +
             "return redis.call('del', KEYS[1]) " +
         "else " +
@@ -56,8 +47,8 @@ public class DistributedLockWithLuaScript {
         System.out.println("Work duration: " + workDurationMs + "ms, Lock TTL: " + LOCK_TTL_SECONDS + "s");
         System.out.flush();
         
-        // Create a connection pool with increased timeout (5000ms) to accommodate deliberate Lua delays
-        JedisPool pool = new JedisPool(new redis.clients.jedis.JedisPoolConfig(), REDIS_HOST, 6379, 5000);
+        // Create a connection pool with 10s timeout to accommodate deliberate blocking
+        JedisPool pool = new JedisPool(new redis.clients.jedis.JedisPoolConfig(), REDIS_HOST, 6379, 10000);
         ExecutorService executor = Executors.newFixedThreadPool(NUM_CONSUMERS);
 
         for (int i = 0; i < NUM_CONSUMERS; i++) {

@@ -93,14 +93,9 @@ The correct implementation using Redis Lua scripting to ensure the check-and-del
 #### Code Snippet (Lua)
 ```lua
 -- DistributedLockWithLuaScript.java
--- Demonstrates atomicity even with a deliberate 100ms delay
-redis.replicate_commands(); 
-local start = redis.call('TIME'); 
-local start_ms = (start[1] * 1000) + (start[2] / 1000); 
-while true do 
-    local now = redis.call('TIME'); 
-    local now_ms = (now[1] * 1000) + (now[2] / 1000); 
-    if (now_ms - start_ms) >= 100 then break end 
+-- Demonstrates atomicity using a deliberate busy-wait loop
+for i = 1, 10000000 do 
+    -- This blocks the entire Redis server while active
 end; 
 if redis.call('get', KEYS[1]) == ARGV[1] then 
     return redis.call('del', KEYS[1]) 
@@ -114,7 +109,7 @@ end
 # Clean state, start, and follow logs
 docker compose --profile lua down && WORK_DURATION=950 docker compose --profile lua up --build -d && docker compose logs -f app-lua
 ```
-*Result: Lock safely released. Even with a 100ms delay **inside** the script, Redis remains blocked, making it impossible for another consumer to grab the lock during that window.*
+*Result: Lock safely released. The busy-wait loop blocks Redis, making it impossible for another consumer to grab the lock during that window.*
 
 ---
 
