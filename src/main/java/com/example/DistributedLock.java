@@ -1,8 +1,5 @@
 package com.example;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -25,7 +22,6 @@ public class DistributedLock {
     private static final int LOCK_TTL_SECONDS = 1;
     private static final int NUM_CONSUMERS = 5;
     private static final String REDIS_HOST = System.getenv().getOrDefault("REDIS_HOST", "localhost");
-    private static final Set<Integer> consumersWithLock = Collections.synchronizedSet(new HashSet<>());
 
     public static void main(String[] args) {
         System.out.println("REDIS_HOST: " + REDIS_HOST);
@@ -52,7 +48,6 @@ public class DistributedLock {
                     while (true) {
                         if (acquireLock(jedis, lockValue)) {
                             System.out.println("Consumer " + consumerId + " acquired the lock.");
-                            consumersWithLock.add(consumerId);
                             // Simulate work that takes less than the lock TTL
                             Thread.sleep(500);
                             System.out.println("Consumer " + consumerId + " attempting to release the lock.");
