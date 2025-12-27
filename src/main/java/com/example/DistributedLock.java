@@ -23,9 +23,16 @@ public class DistributedLock {
     private static final int LOCK_TTL_SECONDS = 1;
     private static final int NUM_CONSUMERS = 5;
     private static final String REDIS_HOST = System.getenv().getOrDefault("REDIS_HOST", "localhost");
+    private static long workDurationMs = 500;  // Default: no race condition
 
     public static void main(String[] args) {
+        // Accept work duration as command line argument
+        if (args.length > 0) {
+            workDurationMs = Long.parseLong(args[0]);
+        }
+        
         System.out.println("Application starting...");
+        System.out.println("Work duration: " + workDurationMs + "ms, Lock TTL: " + LOCK_TTL_SECONDS + "s");
         
         // Create a connection pool (thread-safe, reuses connections)
         JedisPool pool = new JedisPool(REDIS_HOST, 6379);
@@ -44,8 +51,8 @@ public class DistributedLock {
                     while (true) {
                         if (acquireLock(jedis, lockValue)) {
                             System.out.println("Consumer " + consumerId + " acquired the lock.");
-                            // Simulate work that takes less than the lock TTL
-                            Thread.sleep(500);
+                            // Simulate work with configurable duration
+                            Thread.sleep(workDurationMs);
                             System.out.println("Consumer " + consumerId + " attempting to release the lock.");
                             releaseLock(jedis);
                             break;
@@ -92,10 +99,9 @@ public class DistributedLock {
     /**
      * Release the distributed lock by deleting it from Redis
      * 
-     * Simple release (no value checking) because:
-     * - Locks are always released before TTL (500ms < 1 second)
-     * - We control the release timing, so no other consumer can steal it
-     * - This is a straightforward lock/release use case
+     * Simple release (no value checking):
+     * - When work duration < TTL: safe, no race condition
+     * - When work duration > TTL: can cause race condition where lock gets deleted by wrong consumer
      */
     private static void releaseLock(Jedis jedis) {
         jedis.del(LOCK_KEY);
