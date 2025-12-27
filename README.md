@@ -44,13 +44,6 @@ All 5 consumers successfully acquire and release the lock.
 └── README.md                       # This file
 ```
 
-## Technical Details
-
-- **Lock Key**: `my-distributed-lock`
-- **Lock TTL**: 1 second (auto-expires if not released)
-- **Hold Duration**: 500ms (always released before TTL)
-- **Lock Mechanism**: Redis SETNX (atomic "set if not exists")
-
 ## Notes
 
 - This is a **simple lock implementation** suitable for scenarios where locks are always released before TTL
