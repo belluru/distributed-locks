@@ -1,5 +1,8 @@
 package com.example;
 
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,6 +25,7 @@ public class DistributedLock {
     private static final int LOCK_TTL_SECONDS = 1;
     private static final int NUM_CONSUMERS = 5;
     private static final String REDIS_HOST = System.getenv().getOrDefault("REDIS_HOST", "localhost");
+    private static final Set<Integer> consumersWithLock = Collections.synchronizedSet(new HashSet<>());
 
     public static void main(String[] args) {
         System.out.println("REDIS_HOST: " + REDIS_HOST);
@@ -42,26 +46,22 @@ public class DistributedLock {
             executor.submit(() -> {
                 Jedis jedis = null;
                 String lockValue = "consumer-" + consumerId;
-                boolean lockAcquired = false;
                 try {
                     jedis = new Jedis(REDIS_HOST, 6379);
-                    // Retry acquiring lock with backoff
-                    for (int attempt = 0; attempt < 15; attempt++) {
+                    // Keep retrying until lock is acquired
+                    while (true) {
                         if (acquireLock(jedis, lockValue)) {
                             System.out.println("Consumer " + consumerId + " acquired the lock.");
-                            lockAcquired = true;
+                            consumersWithLock.add(consumerId);
                             // Simulate work that takes less than the lock TTL
                             Thread.sleep(500);
                             System.out.println("Consumer " + consumerId + " attempting to release the lock.");
                             releaseLock(jedis);
                             break;
-                        } else if (attempt < 14) {
-                            System.out.println("Consumer " + consumerId + " waiting to retry (attempt " + (attempt + 1) + ")...");
+                        } else {
+                            // Retry with backoff
                             Thread.sleep(200);
                         }
-                    }
-                    if (!lockAcquired) {
-                        System.out.println("Consumer " + consumerId + " failed to acquire the lock after retries.");
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();

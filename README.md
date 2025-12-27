@@ -69,7 +69,7 @@ executor.submit(() -> {
 - **Hold Duration**: 500ms (always released before TTL)
 - **Lock Mechanism**: Redis `SETNX` (atomic "set if not exists")
 - **Lock Release**: Simple `del` command (no value checking needed)
-- **Retry Strategy**: Up to 15 attempts with 200ms backoff
+- **Retry Strategy**: Infinite retries with 200ms backoff (guarantees all consumers acquire lock)
 
 ## Expected Output
 
