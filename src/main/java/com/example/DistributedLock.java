@@ -1,18 +1,17 @@
 package com.example;
 
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.params.SetParams;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.params.SetParams;
+
 
 public class DistributedLock {
 
     private static final String LOCK_KEY = "my-distributed-lock";
-    private static final int LOCK_TTL_SECONDS = 1; // Short TTL to demonstrate race condition
-    private static final int NUM_CONSUMERS = 5; // Reduced for clarity
+    private static final int LOCK_TTL_SECONDS = 1;
+    private static final int NUM_CONSUMERS = 5;
     private static final String REDIS_HOST = System.getenv().getOrDefault("REDIS_HOST", "localhost");
 
     public static void main(String[] args) {
@@ -26,20 +25,27 @@ public class DistributedLock {
 
             executor.submit(() -> {
                 Jedis jedis = null;
-                String lockValue = "consumer-" + consumerId + "-thread-" + Thread.currentThread().getId();
+                String lockValue = "consumer-" + consumerId;
+                boolean lockAcquired = false;
                 try {
                     jedis = new Jedis(REDIS_HOST, 6379);
-                    if (acquireLock(jedis, lockValue)) {
-                        try {
+                    // Retry acquiring lock with backoff
+                    for (int attempt = 0; attempt < 15; attempt++) {
+                        if (acquireLock(jedis, lockValue)) {
                             System.out.println("Consumer " + consumerId + " acquired the lock.");
-                            // Simulate work that takes longer than the lock TTL
-                            Thread.sleep(2000);
-                        } finally {
+                            lockAcquired = true;
+                            // Simulate work that takes less than the lock TTL
+                            Thread.sleep(500);
                             System.out.println("Consumer " + consumerId + " attempting to release the lock.");
-                            releaseLock(jedis, lockValue);
+                            releaseLock(jedis);
+                            break;
+                        } else if (attempt < 14) {
+                            System.out.println("Consumer " + consumerId + " waiting to retry (attempt " + (attempt + 1) + ")...");
+                            Thread.sleep(200);
                         }
-                    } else {
-                        System.out.println("Consumer " + consumerId + " failed to acquire the lock.");
+                    }
+                    if (!lockAcquired) {
+                        System.out.println("Consumer " + consumerId + " failed to acquire the lock after retries.");
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -59,15 +65,6 @@ public class DistributedLock {
             Thread.currentThread().interrupt();
             System.err.println("Main thread interrupted while waiting for consumers.");
         }
-
-        executor.shutdown();
-        try {
-            if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
-                executor.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            executor.shutdownNow();
-        }
         System.out.println("Application finished.");
     }
 
@@ -77,15 +74,8 @@ public class DistributedLock {
         return "OK".equals(result);
     }
 
-    private static void releaseLock(Jedis jedis, String lockValue) {
-        // We can still get the value to show the race condition
-        String currentValue = jedis.get(LOCK_KEY);
-        System.out.println("Releasing lock: lockValue=" + lockValue + ", currentValue=" + currentValue);
-        if (lockValue.equals(currentValue)) {
-            jedis.del(LOCK_KEY);
-            System.out.println("Consumer with lock value " + lockValue + " released the lock.");
-        } else {
-            System.out.println("Consumer with lock value " + lockValue + " did NOT release the lock because the value has changed to " + currentValue);
-        }
+    private static void releaseLock(Jedis jedis) {
+        jedis.del(LOCK_KEY);
+        System.out.println("Lock released successfully.");
     }
 }

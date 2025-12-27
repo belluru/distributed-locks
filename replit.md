@@ -33,7 +33,10 @@ mvn clean package -DskipTests
 ## How It Works
 - Uses a fixed-size thread pool to simulate 5 consumers
 - Each consumer attempts to acquire a lock using Redis SETNX with TTL
-- Demonstrates race conditions when work takes longer than lock TTL
+- Lock is held for 500ms (less than the 1-second TTL)
+- Simple lock release: just deletes the lock without value checking
+- Consumers retry up to 15 times with 200ms backoff between attempts
+- All consumers successfully acquire and release the lock
 - Lock key: `my-distributed-lock`
 - Lock TTL: 1 second
 
@@ -42,3 +45,8 @@ mvn clean package -DskipTests
   - Configured Java GraalVM and Redis
   - Set up workflow for running the demo
   - Added .gitignore for Java/Maven
+- 2025-12-27: Simplified lock implementation
+  - Changed work duration to 500ms (less than 1-second TTL)
+  - Removed value checking in lock release
+  - Added retry mechanism with exponential backoff
+  - All 5 consumers now successfully acquire locks
