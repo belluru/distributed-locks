@@ -113,6 +113,43 @@ docker compose --profile lua down && WORK_DURATION=950 docker compose --profile 
 
 ---
 
+### 5. Redlock Version (Multi-Node, High Availability)
+A distributed lock implementation designed for high availability using 5 independent Redis nodes.
+
+**Quorum Logic:** The lock is acquired successfully only if the consumer can set the lock key in at least **3 out of 5** nodes. This ensures that the system is resilient to up to 2 node failures.
+
+#### Code Snippet (Quorum Acquisition)
+```java
+// Redlock.java
+private static boolean acquireRedlock(String lockValue) {
+    int acquiredCount = 0;
+    SetParams setParams = new SetParams().nx().ex(LOCK_TTL_SECONDS);
+
+    for (JedisPool pool : POOLS) {
+        try (Jedis jedis = pool.getResource()) {
+            String result = jedis.set(LOCK_KEY, lockValue, setParams);
+            if ("OK".equals(result)) acquiredCount++;
+        } catch (Exception e) { /* Node down */ }
+    }
+
+    if (acquiredCount >= 3) return true; // Quorum reached
+    
+    releaseRedlock(lockValue); // Rollback partial locks
+    return false;
+}
+```
+
+#### Run Scenario
+```bash
+# Clean state, start 5 Redis nodes, and follow Redlock logs
+docker compose --profile redlock down && WORK_DURATION=950 docker compose --profile redlock up --build -d && docker compose logs -f app-redlock
+```
+*Result: Consumers acquire the lock only when they reach a quorum. High availability is achieved by distributing the lock state across multiple independent Redis instances.*
+
+This will take more time to acquire the lock compared to the single node version, because it needs to acquire the lock from 3 out of 5 nodes, but that is the tradeoff we make for high availability. So, low throughputs are expected, but availability is high.
+
+---
+
 ## Project Guide
 
 ### Project Structure
@@ -121,7 +158,8 @@ docker compose --profile lua down && WORK_DURATION=950 docker compose --profile 
 │   ├── DistributedLock.java              # Unsafe
 │   ├── DistributedLockWithValueCheck.java# Non-atomic check
 │   ├── DistributedLockWithTOCTOU.java    # Vulnerability demo
-│   └── DistributedLockWithLuaScript.java # Atomic (Lua)
+│   ├── DistributedLockWithLuaScript.java # Atomic (Lua)
+│   └── Redlock.java                      # Multi-node (Quorum)
 ├── Dockerfile                            # Multi-stage build
 ├── docker-compose.yml                    # Service profiles
 └── pom.xml                               # Maven config
@@ -130,7 +168,7 @@ docker compose --profile lua down && WORK_DURATION=950 docker compose --profile 
 ### Docker Profiles
 Run specific versions using profiles:
 ```bash
-docker compose --profile [unsafe|safe|toctou|lua] up --build & sleep 5 && docker compose logs
+docker compose --profile [unsafe|safe|toctou|lua|redlock] up --build
 ```
 
 ---

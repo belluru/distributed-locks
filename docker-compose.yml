@@ -6,6 +6,22 @@ services:
     ports:
       - "6379:6379"
 
+  redis-1:
+    image: "redis:alpine"
+    profiles: ["redlock"]
+  redis-2:
+    image: "redis:alpine"
+    profiles: ["redlock"]
+  redis-3:
+    image: "redis:alpine"
+    profiles: ["redlock"]
+  redis-4:
+    image: "redis:alpine"
+    profiles: ["redlock"]
+  redis-5:
+    image: "redis:alpine"
+    profiles: ["redlock"]
+
   app-unsafe:
     build:
       context: .
@@ -53,3 +69,19 @@ services:
       - REDIS_HOST=redis
     command: ["${WORK_DURATION:-500}"]
     profiles: ["lua"]
+
+  app-redlock:
+    build:
+      context: .
+      args:
+        MAIN_CLASS: com.example.Redlock
+    depends_on:
+      - redis-1
+      - redis-2
+      - redis-3
+      - redis-4
+      - redis-5
+    environment:
+      - REDIS_NODES=redis-1:6379,redis-2:6379,redis-3:6379,redis-4:6379,redis-5:6379
+    command: ["${WORK_DURATION:-950}"]
+    profiles: ["redlock"]
