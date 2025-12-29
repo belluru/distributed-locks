@@ -39,8 +39,8 @@ def run_benchmark(profile, consumers, work_duration):
     return total_time_ms
 
 def main():
-    consumer_counts = [1, 5, 10]
-    work_duration = 200 # Short duration for faster benchmarks
+    consumer_counts = [5, 10, 100, 200]
+    work_duration = 50 # Short duration for faster benchmarks
     
     print(f"{'Consumers':<10} | {'Lua (ms)':<10} | {'Redlock (ms)':<15} | {'Diff (%)':<10}")
     print("-" * 55)
