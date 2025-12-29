@@ -59,7 +59,7 @@ public class App {
                 conn.setAutoCommit(false);
                 try {
                     int seatId = -1;
-                    try (PreparedStatement pstmt = conn.prepareStatement(SELECT_QUERY);
+                    try (PreparedStatement pstmt = conn.prepareStatement(selectQuery);
                          ResultSet rs = pstmt.executeQuery()) {
                         if (rs.next()) {
                             seatId = rs.getInt("seat_id");
