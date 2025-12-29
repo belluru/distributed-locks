@@ -26,16 +26,20 @@ docker compose down -v && docker compose up --build -d && docker compose logs -f
 ```
 
 ### Experiment with Different Locking Strategies
-You can override the `SELECT_QUERY` via command line when starting docker:
+You can override the `SELECT_QUERY` via command line. It's best to `export` the variable to ensure it persists across the chained commands:
+
 ```bash
 # 1. Standard (Race Condition) - Default
-SELECT_QUERY="SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1" docker compose up --build -d && docker compose logs -f app
+export SELECT_QUERY="SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1"
+docker compose down -v && docker compose up --build -d && docker compose logs -f app
 
 # 2. SELECT ... FOR UPDATE (Safety with performance trade-off)
-SELECT_QUERY="SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1 FOR UPDATE" docker compose up --build -d && docker compose logs -f app
+export SELECT_QUERY="SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1 FOR UPDATE"
+docker compose down -v && docker compose up --build -d && docker compose logs -f app
 
 # 3. SELECT ... FOR UPDATE SKIP LOCKED (High performance and safety)
-SELECT_QUERY="SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1 FOR UPDATE SKIP LOCKED" docker compose up --build -d && docker compose logs -f app
+export SELECT_QUERY="SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1 FOR UPDATE SKIP LOCKED"
+docker compose down -v && docker compose up --build -d && docker compose logs -f app
 ```
 
 ### Locking Strategies Explained

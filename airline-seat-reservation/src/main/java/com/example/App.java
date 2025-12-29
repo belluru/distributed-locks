@@ -48,51 +48,63 @@ public class App {
     }
 
     private static void reserveSeat(int passengerId, String passengerName) {
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-            // Enable transaction to make FOR UPDATE effective
-            conn.setAutoCommit(false);
-            try {
-                // 1. Find an available seat using the configured query
-                int seatId = -1;
-                try (PreparedStatement pstmt = conn.prepareStatement(SELECT_QUERY);
-                     ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        seatId = rs.getInt("seat_id");
-                    }
-                }
-
-                if (seatId != -1) {
-                    // Simulate race condition window
-                    Thread.sleep(100);
-
-                    // 2. Assign the seat to the passenger
-                    String assignSeatSql = "UPDATE seats SET passenger_id = ? WHERE seat_id = ?";
-                    try (PreparedStatement pstmt = conn.prepareStatement(assignSeatSql)) {
-                        pstmt.setInt(1, passengerId);
-                        pstmt.setInt(2, seatId);
-                        pstmt.executeUpdate();
+        int maxRetries = 5;
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+                conn.setAutoCommit(false);
+                try {
+                    int seatId = -1;
+                    try (PreparedStatement pstmt = conn.prepareStatement(SELECT_QUERY);
+                         ResultSet rs = pstmt.executeQuery()) {
+                        if (rs.next()) {
+                            seatId = rs.getInt("seat_id");
+                        }
                     }
 
-                    // 3. Update the passenger table
-                    String updatePassengerSql = "UPDATE passengers SET seat_number = ? WHERE id = ?";
-                    try (PreparedStatement pstmt = conn.prepareStatement(updatePassengerSql)) {
-                        pstmt.setInt(1, seatId);
-                        pstmt.setInt(2, passengerId);
-                        pstmt.executeUpdate();
-                    }
+                    if (seatId != -1) {
+                        // Simulate race condition window
+                        Thread.sleep(100);
 
-                    conn.commit();
-                    System.out.println(passengerName + " reserved seat: " + seatId);
-                } else {
+                        // 2. Assign the seat to the passenger
+                        String assignSeatSql = "UPDATE seats SET passenger_id = ? WHERE seat_id = ?";
+                        try (PreparedStatement pstmt = conn.prepareStatement(assignSeatSql)) {
+                            pstmt.setInt(1, passengerId);
+                            pstmt.setInt(2, seatId);
+                            int rowsUpdated = pstmt.executeUpdate();
+                            
+                            if (rowsUpdated == 0) {
+                                // This could happen if we are NOT using FOR UPDATE and someone else took it
+                                conn.rollback();
+                                continue; 
+                            }
+                        }
+
+                        // 3. Update the passenger table
+                        String updatePassengerSql = "UPDATE passengers SET seat_number = ? WHERE id = ?";
+                        try (PreparedStatement pstmt = conn.prepareStatement(updatePassengerSql)) {
+                            pstmt.setInt(1, seatId);
+                            pstmt.setInt(2, passengerId);
+                            pstmt.executeUpdate();
+                        }
+
+                        conn.commit();
+                        System.out.println(passengerName + " reserved seat: " + seatId + " (Attempt " + attempt + ")");
+                        return; // Success!
+                    } else {
+                        conn.rollback();
+                        System.out.println("No seats available for " + passengerName + " (Attempt " + attempt + ")");
+                        // If we truly found no seats, stop retrying
+                        return;
+                    }
+                } catch (Exception e) {
                     conn.rollback();
-                    System.out.println("No seats available for " + passengerName);
+                    if (attempt == maxRetries) throw e;
+                    Thread.sleep(Math.min(100 * attempt, 500)); // Exponential backoff
                 }
-            } catch (Exception e) {
-                conn.rollback();
-                throw e;
+            } catch (SQLException | InterruptedException e) {
+                System.err.println("Error for " + passengerName + " (Attempt " + attempt + "): " + e.getMessage());
+                if (attempt == maxRetries) break;
             }
-        } catch (SQLException | InterruptedException e) {
-            System.err.println("Error for " + passengerName + ": " + e.getMessage());
         }
     }
 
