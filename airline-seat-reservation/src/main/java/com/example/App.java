@@ -15,12 +15,17 @@ public class App {
     private static final String DB_USER = System.getenv("DB_USER") != null ? System.getenv("DB_USER") : "root";
     private static final String DB_PASSWORD = System.getenv("DB_PASSWORD") != null ? System.getenv("DB_PASSWORD") : "rootpassword";
 
-    private static final String SELECT_QUERY = (System.getenv("SELECT_QUERY") != null && !System.getenv("SELECT_QUERY").trim().isEmpty()) ? 
-            System.getenv("SELECT_QUERY") : "SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1";
+    private static String selectQuery = "SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1";
 
     public static void main(String[] args) {
+        if (args.length > 0 && !args[0].trim().isEmpty()) {
+            selectQuery = args[0];
+        } else if (System.getenv("SELECT_QUERY") != null && !System.getenv("SELECT_QUERY").trim().isEmpty()) {
+            selectQuery = System.getenv("SELECT_QUERY");
+        }
+
         System.out.println("Starting Seat Reservation Simulation...");
-        System.out.println("Using Query: " + SELECT_QUERY);
+        System.out.println("Using Query: " + selectQuery);
 
         waitForDatabase();
         
