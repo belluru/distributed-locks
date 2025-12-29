@@ -9,12 +9,16 @@ services:
       - "3306:3306"
     volumes:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command:
+      - --innodb_flush_log_at_trx_commit=0
+      - --innodb_doublewrite=0
+      - --skip-log-bin
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -uroot -p$${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 30
+      start_period: 60s
 
   app:
     build: .

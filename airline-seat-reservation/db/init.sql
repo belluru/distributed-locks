@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS seats (
     passenger_id INT DEFAULT NULL
 );
 
--- Insert 100 passengers
+-- Bulk insert 100 passengers
 INSERT INTO passengers (name) VALUES 
 ('Passenger 1'), ('Passenger 2'), ('Passenger 3'), ('Passenger 4'), ('Passenger 5'),
 ('Passenger 6'), ('Passenger 7'), ('Passenger 8'), ('Passenger 9'), ('Passenger 10'),
@@ -35,16 +35,10 @@ INSERT INTO passengers (name) VALUES
 ('Passenger 91'), ('Passenger 92'), ('Passenger 93'), ('Passenger 94'), ('Passenger 95'),
 ('Passenger 96'), ('Passenger 97'), ('Passenger 98'), ('Passenger 99'), ('Passenger 100');
 
--- Insert 100 seats
-DELIMITER //
-CREATE PROCEDURE populate_seats()
-BEGIN
-    DECLARE i INT DEFAULT 1;
-    WHILE i <= 100 DO
-        INSERT INTO seats (seat_id) VALUES (i);
-        SET i = i + 1;
-    END WHILE;
-END //
-DELIMITER ;
-CALL populate_seats();
-DROP PROCEDURE populate_seats;
+-- Bulk insert 100 seats (using a single multi-row INSERT for speed)
+INSERT INTO seats (seat_id) VALUES 
+(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15),(16),(17),(18),(19),(20),
+(21),(22),(23),(24),(25),(26),(27),(28),(29),(30),(31),(32),(33),(34),(35),(36),(37),(38),(39),(40),
+(41),(42),(43),(44),(45),(46),(47),(48),(49),(50),(51),(52),(53),(54),(55),(56),(57),(58),(59),(60),
+(61),(62),(63),(64),(65),(66),(67),(68),(69),(70),(71),(72),(73),(74),(75),(76),(77),(78),(79),(80),
+(81),(82),(83),(84),(85),(86),(87),(88),(89),(90),(91),(92),(93),(94),(95),(96),(97),(98),(99),(100);
