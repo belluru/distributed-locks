@@ -1,6 +1,6 @@
 # Distributed Lock Prototype
 
-A Java prototype demonstrating distributed lock implementation with Redis. This project explores the progression from simple, unsafe locks to production-ready atomic operations.
+A Java prototype demonstrating distributed lock implementation with Redis. This project explores the progression from simple, unsafe locks to production-ready atomic operations using lua scripts and runs a benchmark to compare the performance of different implementations.
 
 ## Core Technical Details
 
