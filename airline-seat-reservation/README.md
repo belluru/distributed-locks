@@ -20,16 +20,29 @@ Because this sequence is not atomic (it lacks `SELECT ... FOR UPDATE` or seriali
 ## How to Run
 
 ### Run the Simulation
-To ensure a fresh start (clearing old volumes) and run the simulation with logs following, execute:
+To run the simulation with default settings (race condition):
 ```bash
 docker compose down -v && docker compose up --build -d && docker compose logs -f app
 ```
-Alternatively, if you want to see logs for all services (including MySQL):
+
+### Experiment with Different Locking Strategies
+You can override the `SELECT_QUERY` via command line when starting docker:
 ```bash
-docker compose down -v && docker compose up --build
+# 1. Standard (Race Condition) - Default
+SELECT_QUERY="SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1" docker compose up --build -d && docker compose logs -f app
+
+# 2. SELECT ... FOR UPDATE (Safety with performance trade-off)
+SELECT_QUERY="SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1 FOR UPDATE" docker compose up --build -d && docker compose logs -f app
+
+# 3. SELECT ... FOR UPDATE SKIP LOCKED (High performance and safety)
+SELECT_QUERY="SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1 FOR UPDATE SKIP LOCKED" docker compose up --build -d && docker compose logs -f app
 ```
-- Several passengers think they have the same seat.
-- The `seats` table only reflects the final `UPDATE`.
+
+### Metrics & Reconciliation
+At the end of the simulation, the application will output:
+- **Total time taken**: The duration for all 100 passengers to attempt their reservation.
+- **Seat Assignments**: The current state of the `seats` table.
+- **Passenger Intentions**: What each passenger *thinks* they have (from the `passengers` table).
 
 ## Project Structure
 - `App.java`: Main logic including the vulnerable `reserveSeat` method.

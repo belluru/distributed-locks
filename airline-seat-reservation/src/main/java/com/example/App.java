@@ -14,9 +14,15 @@ public class App {
     private static final String DB_USER = System.getenv("DB_USER") != null ? System.getenv("DB_USER") : "root";
     private static final String DB_PASSWORD = System.getenv("DB_PASSWORD") != null ? System.getenv("DB_PASSWORD") : "rootpassword";
 
+    private static final String SELECT_QUERY = System.getenv("SELECT_QUERY") != null ? 
+            System.getenv("SELECT_QUERY") : "SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1";
+
     public static void main(String[] args) {
         System.out.println("Starting Seat Reservation Simulation...");
+        System.out.println("Using Query: " + SELECT_QUERY);
         
+        long startTime = System.currentTimeMillis();
+
         ExecutorService executor = Executors.newFixedThreadPool(10);
         for (int i = 1; i <= 100; i++) {
             final int passengerId = i;
@@ -31,16 +37,18 @@ public class App {
             e.printStackTrace();
         }
 
-        System.out.println("Simulation complete. Printing final seat assignments...");
+        long endTime = System.currentTimeMillis();
+        System.out.println("Simulation complete.");
+        System.out.println("Total time taken: " + (endTime - startTime) + "ms");
+        System.out.println("Printing final seat assignments...");
         printSummary();
     }
 
     private static void reserveSeat(int passengerId, String passengerName) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-            // 1. Find an available seat (WITHOUT SELECT FOR UPDATE)
-            String findSeatSql = "SELECT seat_id FROM seats WHERE passenger_id IS NULL LIMIT 1";
+            // 1. Find an available seat using the configured query
             int seatId = -1;
-            try (PreparedStatement pstmt = conn.prepareStatement(findSeatSql);
+            try (PreparedStatement pstmt = conn.prepareStatement(SELECT_QUERY);
                  ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     seatId = rs.getInt("seat_id");
