@@ -87,3 +87,10 @@ services:
       - NUM_CONSUMERS=${NUM_CONSUMERS:-5}
     command: ["${WORK_DURATION:-950}"]
     profiles: ["redlock"]
+
+  app-paxos:
+    build:
+      context: .
+      args:
+        MAIN_CLASS: com.example.paxos.PaxosDemo
+    profiles: ["paxos"]

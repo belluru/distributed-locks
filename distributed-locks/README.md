@@ -148,44 +148,37 @@ docker compose --profile redlock down && WORK_DURATION=950 docker compose --prof
 
 Play around with duration more than TTL such as 1500ms to see the effect of quorum. Delete is atomic, so we should not encounter race conditions.
 
-This will take more time to acquire the lock compared to the single node version, because it needs to acquire the lock from 3 out of 5 nodes, but that is the tradeoff we make for high availability. So, low throughputs are expected, but availability is high.
+### 6. Paxos Version (Consensus-based, Production Grade)
+A distributed lock implementation using a simplified Paxos consensus algorithm to address Redlock's limitations regarding clock synchronization and process pauses.
+
+**Key Features:**
+- **Logical Time**: Uses sequence numbers instead of physical clocks.
+- **Fencing Tokens**: Provides monotonically increasing tokens to prevent stale writes.
+- **Quorum-based Agreement**: Ensures consistency across 5 nodes.
+
+#### Run Scenario
+```bash
+docker compose --profile paxos up --build
+```
+
+**[Read the Detailed Paxos Guide](file:///Users/ellurubharath/Documents/Coding/prototypes/distributed-locks/PAXOS_README.md)** for a deep dive into Redlock limitations and the Paxos solution.
 
 ---
 
 ## Performance Benchmarking
-
-To compare the throughput and latency between the single-node Lua version and the multi-node Redlock version, you can use the provided Python benchmark script.
-
-### Requirements
-- Python 3
-- Docker and Docker Compose
-
-### Running the Benchmark
-```bash
-python3 benchmark.py
-```
-
-### Key Observations
-1.  **Latency**: Redlock is significantly slower than single-node Lua because it must perform at least 3 successful network round-trips to different Redis nodes.
-2.  **Scalability**: As the number of consumers increases, the contention for the lock grows. Redlock's overhead becomes more apparent as more nodes are involved in each acquisition/release cycle.
-3.  **Tradeoff**: Single-node Redis offers maximum performance but is a single point of failure (SPOF). Redlock offers High Availability (HA) at the cost of increased latency and lower throughput.
-
----
-
-## Project Guide
-
-### Project Structure
-```
+...
+...
+...
 ├── src/main/java/com/example/
-│   ├── DistributedLock.java              # Unsafe
-│   ├── DistributedLockWithValueCheck.java# Non-atomic check
-│   ├── DistributedLockWithTOCTOU.java    # Vulnerability demo
-│   ├── DistributedLockWithLuaScript.java # Atomic (Lua)
-│   └── Redlock.java                      # Multi-node (Quorum)
+│   ├── ...
+│   └── paxos/                          # Paxos Implementation
+│       ├── FencingToken.java
+│       ├── PaxosNode.java
+│       ├── PaxosLock.java
+│       └── PaxosDemo.java
+├── PAXOS_README.md                       # Detailed Paxos docs
 ├── Dockerfile                            # Multi-stage build
-├── docker-compose.yml                    # Service profiles
-└── pom.xml                               # Maven config
-```
+...
 
 ### Docker Profiles
 Run specific versions using profiles:
