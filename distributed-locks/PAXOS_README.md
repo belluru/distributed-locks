@@ -42,6 +42,8 @@ Consensus-based locks solve these issues by using **logical time** and **fencing
 
 1.  **No physical clock dependency**: Paxos uses "ballot numbers" or "sequence numbers". Even if Node A thinks it's 2025 and Node B thinks it's 1990, they can still agree that `Sequence 34` comes after `Sequence 33`.
 2.  **Leader Coordination**: By electing a leader node, we avoid the "Live Lock" scenario where two clients grab partial quorums. The leader handles all requests sequentially, ensuring that only one proposal is active for a specific lock at a time.
+    > [!NOTE]
+    > **Prototype Limitation**: This simplified `PaxosDemo` does not implement a dynamic leader election logic. Instead, it simulates a multi-proposer environment where any client can initiate a proposal. In a production system (like Raft or Multi-Paxos), a stable leader would be elected to optimize performance and prevent contention.
 3.  **Fencing Tokens (The GC fix)**: This is the most critical part. Even if a client pauses for 100 years, when it wakes up, it presents its "Fencing Token". The storage system (e.g., a database or file system) checks its own record of the "last successful token". If the client's token is older, the write is rejected regardless of the client's local "lock ownership" belief.
 
 > [!IMPORTANT]
