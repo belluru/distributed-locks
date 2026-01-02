@@ -8,19 +8,19 @@ services:
 
   redis-1:
     image: "redis:alpine"
-    profiles: ["redlock"]
+    profiles: ["redlock", "redlock-gc", "redlock-drift"]
   redis-2:
     image: "redis:alpine"
-    profiles: ["redlock"]
+    profiles: ["redlock", "redlock-gc", "redlock-drift"]
   redis-3:
     image: "redis:alpine"
-    profiles: ["redlock"]
+    profiles: ["redlock", "redlock-gc", "redlock-drift"]
   redis-4:
     image: "redis:alpine"
-    profiles: ["redlock"]
+    profiles: ["redlock", "redlock-gc", "redlock-drift"]
   redis-5:
     image: "redis:alpine"
-    profiles: ["redlock"]
+    profiles: ["redlock", "redlock-gc", "redlock-drift"]
 
   app-unsafe:
     build:
