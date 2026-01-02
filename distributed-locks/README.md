@@ -166,13 +166,13 @@ These demos are specifically designed to replicate the safety failures discussed
 #### 1. GC Pause Vulnerability
 Simulates Client A acquiring the lock and then hitting a long pause. Client B takes over, and when Client A wakes up, both are in the critical section!
 ```bash
-docker compose --profile redlock-gc up --build
+docker compose --profile redlock-gc down && docker compose --profile redlock-gc up --build -d && docker compose logs -f app-redlock-gc
 ```
 
 #### 2. Clock Drift Vulnerability
 Simulates a quorum of nodes (3/5) having their clocks jump forward, causing keys to expire early. Client B acquires the lock while Client A still thinks it holds it.
 ```bash
-docker compose --profile redlock-drift up --build
+docker compose --profile redlock-drift down && docker compose --profile redlock-drift up --build -d && docker compose logs -f app-redlock-drift
 ```
 
 ---
@@ -187,7 +187,7 @@ A distributed lock implementation using a simplified Paxos consensus algorithm t
 
 #### Run Scenario
 ```bash
-docker compose --profile paxos up --build
+docker compose --profile paxos down && docker compose --profile paxos up --build -d && docker compose logs -f app-paxos
 ```
 
 **[Read the Detailed Paxos Guide](file:///Users/ellurubharath/Documents/Coding/prototypes/distributed-locks/PAXOS_README.md)** for a deep dive into Redlock limitations and the Paxos solution.

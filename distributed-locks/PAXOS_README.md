@@ -81,7 +81,7 @@ sequenceDiagram
 You can run the Paxos demonstration using Docker:
 
 ```bash
-docker compose --profile paxos up --build
+docker compose --profile paxos down && docker compose --profile paxos up --build -d && docker compose logs -f app-paxos
 ```
 
 The demo simulates a scenario where Client A acquires a lock, experiences a "pause", Client B takes over the lock with a higher token, and Client A's subsequent "stale" write is safely rejected by the storage system.
